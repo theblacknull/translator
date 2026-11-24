@@ -87,6 +87,8 @@ pub fn scan_models(s: &Settings) -> Result<Vec<String>, String> {
     if crate::riva::available() {
         ids.insert(0, crate::riva::MODEL_ID.to_string());
     }
+    // Google Translate luôn có sẵn, không cần khóa API
+    ids.insert(0, crate::google::MODEL_ID.to_string());
     Ok(ids)
 }
 
@@ -216,7 +218,7 @@ fn choose_model(s: &Settings, key: &str) -> String {
     if s.model != "auto" {
         return s.model.clone();
     }
-    let cloud: Vec<String> = s.models.iter().filter(|m| !m.starts_with("local/")).cloned().collect();
+    let cloud: Vec<String> = s.models.iter().filter(|m| !m.starts_with("local/") && !m.starts_with("google/")).cloned().collect();
     let now = now_secs();
     let fresh = !s.fast_models.is_empty() && now.saturating_sub(s.last_ping) < PING_INTERVAL_SECS;
     if fresh {
@@ -243,6 +245,10 @@ fn choose_model(s: &Settings, key: &str) -> String {
 }
 
 pub fn translate(text: &str, target: &str, source: &str, s: &Settings) -> Result<String, String> {
+    // Google Translate: không cần khóa API, tách riêng khỏi nhóm model của NVIDIA
+    if s.model == crate::google::MODEL_ID {
+        return crate::google::translate(text, target, source);
+    }
     let key = s.effective_key();
     if key.is_empty() {
         return Err("Chưa có API key (nhập trong Cài đặt hoặc file .env)".into());

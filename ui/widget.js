@@ -9,6 +9,7 @@ const els = {
   input: $('input'),
   count: $('count'),
   paste: $('paste'),
+  mic: $('mic'),
   clear: $('clear'),
   speakSrc: $('speak-src'),
   output: $('output'),
@@ -178,16 +179,21 @@ function applyUiLanguage(code) {
 }
 
 // ---------- Model ----------
+const GOOGLE_MODEL = 'google/translate';
+// Tên hiển thị của model: Google có tên riêng, còn lại lấy phần sau dấu "/"
+const modelLabel = (m) => (m === GOOGLE_MODEL ? t('googleModel') : m.split('/').pop());
+
 function fillModelSelect() {
   const models = settings.models || [];
   const current = settings.model || AUTO;
-  const all = new Set(models);
+  // Google Translate luôn có trong danh sách, kể cả khi chưa quét model
+  const all = new Set([GOOGLE_MODEL, ...models]);
   if (current !== AUTO) all.add(current);
   const fast = settings.fastModels || [];
-  const autoLabel = fast.length ? `${t('auto')} · ${fast[0].split('/').pop()}` : t('auto');
+  const autoLabel = fast.length ? `${t('auto')} · ${modelLabel(fast[0])}` : t('auto');
   const opts = [`<option value="${AUTO}">${escapeHtml(autoLabel)}</option>`];
   for (const m of all) {
-    opts.push(`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`);
+    opts.push(`<option value="${escapeHtml(m)}">${escapeHtml(modelLabel(m))}</option>`);
   }
   els.setModel.innerHTML = opts.join('');
   els.setModel.value = current;
@@ -196,8 +202,8 @@ function fillModelSelect() {
 function updateSummaries() {
   const active = settings.model === AUTO ? (settings.fastModels || [])[0] : settings.model;
   els.sumModel.textContent = settings.model === AUTO
-    ? (active ? `${t('auto')} · ${active.split('/').pop()}` : t('auto'))
-    : settings.model.split('/').pop();
+    ? (active ? `${t('auto')} · ${modelLabel(active)}` : t('auto'))
+    : modelLabel(settings.model);
   els.sumTarget.textContent = langName(settings.targetLang);
   els.sumVoice.textContent = settings.voiceName === 'f5' ? t('voiceAI') : t('voiceMachine');
   els.sumUiLang.textContent = UI_LANG_NAMES[settings.uiLang] || UI_LANG_NAMES.vi;
@@ -244,15 +250,264 @@ function applySettingsToUI() {
   updateSummaries();
 }
 
+// ---------- Nhập bằng giọng nói ----------
+// Ghi âm, cắt đoạn khi có khoảng lặng, gửi lần lượt lên Google STT (dùng được với mọi giọng).
+// Không dùng nhận dạng của trình duyệt: thử trong WebView2 cho kết quả rỗng.
+let mic = null; // { mode, committed, stopping, queue, ... }
+let micBase = ''; // nội dung đã có trong ô nhập trước khi bấm mic
+
+function setMicUi(on) {
+  els.mic.classList.toggle('recording', on);
+  const label = on ? t('micStop') : t('mic');
+  els.mic.title = label;
+  els.mic.setAttribute('aria-label', label);
+}
+
+// Hiện chữ đã nhận vào ô nhập: nội dung cũ + đoạn đã chốt + đoạn đang nói
+function showMic(interim) {
+  const parts = [micBase, mic ? mic.committed : '', interim || ''].map((s) => (s || '').trim()).filter(Boolean);
+  els.input.value = parts.join(' ').slice(0, 5000);
+  els.count.textContent = `${els.input.value.length}/5000`;
+}
+
+function commitMic(text) {
+  const s = (text || '').trim();
+  if (!s) return;
+  mic.committed = mic.committed ? `${mic.committed} ${s}` : s;
+}
+
+// Đổi mảng mẫu về 16 kHz (tuyến tính) rồi thành PCM 16-bit little-endian
+function toPcm16k(chunks, fromRate) {
+  let len = 0;
+  for (const c of chunks) len += c.length;
+  const all = new Float32Array(len);
+  let o = 0;
+  for (const c of chunks) { all.set(c, o); o += c.length; }
+  const outLen = Math.floor(len * 16000 / fromRate);
+  const buf = new ArrayBuffer(outLen * 2);
+  const view = new DataView(buf);
+  const ratio = fromRate / 16000;
+  for (let i = 0; i < outLen; i++) {
+    const pos = i * ratio;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(i0 + 1, len - 1);
+    const frac = pos - i0;
+    const s = Math.max(-1, Math.min(1, all[i0] * (1 - frac) + all[i1] * frac));
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Uint8Array(buf);
+}
+
+// Ngôn ngữ gửi cho Google STT: mặc định tiếng Việt; nếu chọn ngôn ngữ nguồn cụ thể thì dùng ngôn ngữ đó
+function sttLangs() {
+  if (els.src.value !== 'auto') {
+    const l = LANGS.find((x) => x.code === els.src.value);
+    return [l ? l.bcp : 'vi-VN'];
+  }
+  return ['vi-VN'];
+}
+
+async function startMic() {
+  if (mic) return;
+  micBase = els.input.value;
+  mic = { mode: 'chunk', committed: '', stopping: false, queue: Promise.resolve() };
+  setMicUi(true);
+  startChunk();
+}
+
+// Cắt đoạn theo nhịp nói (kiểu VAD của các app thương mại):
+// - theo dõi nền tiếng ồn để tự đặt ngưỡng; chỉ bắt đầu đoạn khi có tiếng đủ dài (chống tiếng click)
+// - giữ đệm trước khi nói (pre-roll) để không mất chữ đầu
+// - kết thúc đoạn khi im lặng đủ lâu (hết câu); nói quá dài thì cắt ở chỗ nhỏ nhất gần nhất
+const VAD = {
+  preRollMs: 400,     // đệm trước khi nói
+  startBuffers: 2,    // số khung liên tiếp có tiếng mới bắt đầu đoạn
+  minVoicedMs: 300,   // đoạn có ít tiếng hơn mức này thì bỏ
+  endSilenceMs: 700,  // im lặng đủ lâu => hết câu, gửi đoạn
+  breathMs: 300,      // nghỉ ngắn (lấy hơi) khi đoạn đã dài
+  breathAfterMs: 6000,
+  maxMs: 12000,       // quá dài thì cắt ở chỗ nhỏ nhất
+  searchMs: 3000,     // khoảng tìm chỗ cắt nhỏ nhất
+};
+
+function vadReset(v) {
+  Object.assign(v, { state: 'idle', seg: [], segLen: 0, silentMs: 0, startCount: 0 });
+}
+
+// Khung: { data, ms, rms, loud }
+function vadPushRing(v, frame, rate) {
+  v.ring.push(frame);
+  v.ringLen += frame.data.length;
+  while (v.ring.length > 1 && v.ringLen - v.ring[0].data.length > (VAD.preRollMs / 1000) * rate) {
+    v.ringLen -= v.ring.shift().data.length;
+  }
+}
+
+// Gửi một đoạn lên Google theo thứ tự (hàng đợi)
+function queueSegment(chunks, rate, voicedMs) {
+  if (voicedMs < VAD.minVoicedMs) return;
+  mic.queue = mic.queue.then(async () => {
+    if (!mic) return;
+    els.status.textContent = t('micBusy');
+    const res = await window.api.googleStt(Array.from(toPcm16k(chunks, rate)), sttLangs());
+    els.status.textContent = '';
+    if (!mic) return;
+    if (res.ok) {
+      commitMic(res.text);
+      showMic('');
+    } else {
+      setError(res.error);
+    }
+  });
+}
+
+// Kết thúc đoạn. cutAt: chỉ số khung để cắt (nếu nói quá dài); phần sau tiếp tục là đoạn mới
+function vadFinish(v, rate, cutAt) {
+  const k = cutAt === undefined ? v.seg.length : cutAt + 1;
+  const head = v.seg.slice(0, k);
+  const tail = v.seg.slice(k);
+  const voiced = head.reduce((n, f) => n + (f.loud ? f.ms : 0), 0);
+  queueSegment(head.map((f) => f.data), rate, voiced);
+  vadReset(v);
+  if (tail.length) {
+    v.state = 'speech';
+    v.seg = tail;
+    v.segLen = tail.reduce((n, f) => n + f.data.length, 0);
+    let end = tail.length;
+    while (end > 0 && !tail[end - 1].loud) end--;
+    v.silentMs = (tail.length - end) * tail[0].ms;
+  }
+}
+
+function vadProcess(v, frame, rate, thr) {
+  const { loud } = frame;
+  if (v.state === 'idle') {
+    if (!loud) v.floor = v.floor * 0.97 + frame.rms * 0.03; // theo dõi tiếng nền
+    vadPushRing(v, frame, rate);
+    v.startCount = loud ? v.startCount + 1 : 0;
+    if (v.startCount >= VAD.startBuffers) {
+      v.state = 'speech';
+      v.seg = v.ring;
+      v.segLen = v.ringLen;
+      v.ring = [];
+      v.ringLen = 0;
+      v.silentMs = 0;
+    }
+    return;
+  }
+  v.seg.push(frame);
+  v.segLen += frame.data.length;
+  if (loud) v.silentMs = 0; else v.silentMs += frame.ms;
+  const segMs = (v.segLen / rate) * 1000;
+
+  if (v.silentMs >= VAD.endSilenceMs) return vadFinish(v, rate);
+  if (segMs >= VAD.breathAfterMs && v.silentMs >= VAD.breathMs) return vadFinish(v, rate);
+  if (segMs >= VAD.maxMs) {
+    // tìm khung nhỏ nhất trong vài giây gần nhất để cắt (tránh cắt giữa chữ)
+    const from = Math.max(0, v.seg.length - Math.round(VAD.searchMs / frame.ms));
+    let best = from;
+    for (let i = from; i < v.seg.length; i++) if (v.seg[i].rms < v.seg[best].rms) best = i;
+    return vadFinish(v, rate, best);
+  }
+}
+
+// Một AudioContext dùng chung, tạo sẵn từ lúc mở app: tạo mới mỗi lần bấm mic mất ~650 ms
+// trước khi nhận được âm thanh, nên đầu câu bị mất (chữ "hello" đầu tiên)
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new AudioContext();
+  return audioCtx;
+}
+
+async function startChunk() {
+  mic.mode = 'chunk';
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    setError(t('micErr'));
+    finishMic();
+    return;
+  }
+  const ctx = getAudioCtx();
+  await ctx.resume();
+  const src = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(2048, 1, 1);
+  const v = { floor: 0.004, ring: [], ringLen: 0 };
+  vadReset(v);
+  Object.assign(mic, { ctx, stream, src, proc, vad: v });
+  proc.onaudioprocess = (e) => {
+    if (!mic || mic.stopping) return;
+    const data = new Float32Array(e.inputBuffer.getChannelData(0));
+    let sum = 0;
+    for (const x of data) sum += x * x;
+    const rms = Math.sqrt(sum / data.length);
+    const ms = (data.length / ctx.sampleRate) * 1000;
+    const thr = Math.max(v.floor * 3, 0.008);
+    vadProcess(v, { data, ms, rms, loud: rms > thr }, ctx.sampleRate, thr);
+  };
+  src.connect(proc);
+  proc.connect(ctx.destination);
+}
+
+async function stopMic() {
+  if (!mic || mic.stopping) return;
+  mic.stopping = true;
+  if (mic.proc) mic.proc.disconnect();
+  const v = mic.vad;
+  if (v && v.state === 'speech') vadFinish(v, mic.ctx.sampleRate);
+  mic.queue.then(() => finishMic());
+}
+
+function finishMic() {
+  if (!mic) return;
+  const m = mic;
+  mic = null;
+  if (m.src) m.src.disconnect();
+  if (m.proc) m.proc.disconnect();
+  if (m.stream) m.stream.getTracks().forEach((tr) => tr.stop());
+  setMicUi(false);
+  els.status.textContent = '';
+  if (m.committed || micBase) {
+    els.input.value = [micBase, m.committed].map((s) => (s || '').trim()).filter(Boolean).join(' ').slice(0, 5000);
+    els.count.textContent = `${els.input.value.length}/5000`;
+    runTranslate();
+  }
+}
+
+// Ngôn ngữ nguồn/đích đang chọn trước lần đổi gần nhất (để đổi chỗ khi trùng)
+let lastSrc = 'auto';
+let lastTgt = null;
+
+// Đặt ngôn ngữ đích. Nếu đích trùng nguồn thì nguồn nhận ngôn ngữ đích cũ (đổi chỗ).
+function setTargetLang(code, fromTarget = false) {
+  if (fromTarget && code === els.src.value && code !== 'auto') {
+    const prev = lastTgt && lastTgt !== code ? lastTgt : (code === 'en' ? 'vi' : 'en');
+    els.src.value = prev;
+    lastSrc = prev;
+  }
+  els.tgt.value = code;
+  els.setTarget.value = code;
+  lastTgt = code;
+  saveSettings({ targetLang: code });
+  runTranslate();
+}
+
 function bindEvents() {
+  els.mic.addEventListener('click', () => (mic ? stopMic() : startMic()));
   // Ô nhập & dịch tự động
   els.input.addEventListener('input', () => scheduleTranslate());
-  els.src.addEventListener('change', () => runTranslate());
-  els.tgt.addEventListener('change', () => {
-    saveSettings({ targetLang: els.tgt.value });
-    els.setTarget.value = els.tgt.value;
+  els.src.addEventListener('change', () => {
+    const v = els.src.value;
+    if (v !== 'auto' && v === els.tgt.value) {
+      // Trùng đích: đích nhận ngôn ngữ nguồn cũ (đổi chỗ), nếu không có thì chọn ngôn ngữ khác
+      const fallback = lastSrc !== 'auto' && lastSrc !== v ? lastSrc : (v === 'en' ? 'vi' : 'en');
+      setTargetLang(fallback);
+    }
+    lastSrc = els.src.value;
     runTranslate();
   });
+  els.tgt.addEventListener('change', () => setTargetLang(els.tgt.value, true));
 
   els.swap.addEventListener('click', () => {
     const src = els.src.value;
@@ -347,11 +602,7 @@ function bindEvents() {
   });
 
   // Cài đặt: dịch
-  els.setTarget.addEventListener('change', () => {
-    saveSettings({ targetLang: els.setTarget.value });
-    els.tgt.value = els.setTarget.value;
-    runTranslate();
-  });
+  els.setTarget.addEventListener('change', () => setTargetLang(els.setTarget.value, true));
   els.setAutoSpeak.addEventListener('change', () => saveSettings({ autoSpeak: els.setAutoSpeak.checked }));
 
   // Cài đặt: giọng
@@ -382,6 +633,7 @@ function bindEvents() {
 }
 
 async function init() {
+  getAudioCtx(); // tạo sẵn để bấm mic là có âm thanh ngay
   settings = await window.api.getSettings();
   setLang(settings.uiLang || 'vi');
   els.src.innerHTML = `<option value="auto">${escapeHtml(t('detect'))}</option>${langOptionsHtml()}`;
@@ -392,6 +644,7 @@ async function init() {
   ['src', 'tgt', 'set-model', 'set-target', 'set-voice', 'set-ui-lang'].forEach((id) => DropdownKit.enhance($(id)));
   els.src.value = 'auto';
   els.tgt.value = settings.targetLang;
+  lastTgt = settings.targetLang;
   showOutput('');
 
   // Giọng của máy có thể đến muộn: làm mới danh sách khi đã nạp xong

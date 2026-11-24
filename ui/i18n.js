@@ -62,6 +62,11 @@
       cancel: 'Hủy',
       ok: 'Đồng ý',
       changeLang: 'Đổi ngôn ngữ dịch',
+      mic: 'Nhập bằng giọng nói',
+      micStop: 'Dừng ghi âm',
+      micBusy: 'Đang nhận dạng…',
+      micErr: 'Không dùng được micro',
+      googleModel: 'Google Translate',
     },
     en: {
       appName: 'Quick Translate',
@@ -123,6 +128,11 @@
       cancel: 'Cancel',
       ok: 'OK',
       changeLang: 'Change translation language',
+      mic: 'Speak to input text',
+      micStop: 'Stop recording',
+      micBusy: 'Recognizing…',
+      micErr: 'Microphone not available',
+      googleModel: 'Google Translate',
     },
     ru: {
       appName: 'Быстрый перевод',
@@ -184,6 +194,11 @@
       cancel: 'Отмена',
       ok: 'ОК',
       changeLang: 'Изменить язык перевода',
+      mic: 'Ввести голосом',
+      micStop: 'Остановить запись',
+      micBusy: 'Распознавание…',
+      micErr: 'Микрофон недоступен',
+      googleModel: 'Google Translate',
     },
   };
 

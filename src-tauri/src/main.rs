@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
+mod google;
 mod hotkey;
 mod riva;
 mod supertonic;
@@ -76,6 +77,39 @@ async fn translate(text: String, target: String, source: String) -> Value {
             }
             Err(e) => json!({"ok": false, "error": e}),
         }
+    })
+    .await
+    .unwrap_or_else(|_| json!({"ok": false, "error": "lỗi nội bộ"}))
+}
+
+// ---------- Endpoint Google (tách riêng) ----------
+#[tauri::command]
+async fn google_translate(text: String, target: String, source: String) -> Value {
+    tauri::async_runtime::spawn_blocking(move || match google::translate(&text, &target, &source) {
+        Ok(t) => json!({"ok": true, "text": t}),
+        Err(e) => json!({"ok": false, "error": e}),
+    })
+    .await
+    .unwrap_or_else(|_| json!({"ok": false, "error": "lỗi nội bộ"}))
+}
+
+/// Đọc thành tiếng bằng Google: trả về MP3 dạng base64
+#[tauri::command]
+async fn google_tts(text: String, lang: String) -> Value {
+    tauri::async_runtime::spawn_blocking(move || match google::tts(&text, &lang) {
+        Ok(mp3) => json!({"ok": true, "mp3": base64(&mp3)}),
+        Err(e) => json!({"ok": false, "error": e}),
+    })
+    .await
+    .unwrap_or_else(|_| json!({"ok": false, "error": "lỗi nội bộ"}))
+}
+
+/// Chuyển giọng nói thành chữ: `pcm` là PCM 16-bit mono 16 kHz; `langs` như ["vi-VN", "en-US"] (nhiều mã = tự chọn)
+#[tauri::command]
+async fn google_stt(pcm: Vec<u8>, langs: Vec<String>) -> Value {
+    tauri::async_runtime::spawn_blocking(move || match google::stt_best(&pcm, &langs) {
+        Ok(t) => json!({"ok": true, "text": t}),
+        Err(e) => json!({"ok": false, "error": e}),
     })
     .await
     .unwrap_or_else(|_| json!({"ok": false, "error": "lỗi nội bộ"}))
@@ -375,6 +409,9 @@ fn main() {
             popup_drag_move,
             popup_drag_end,
             popup_retranslate,
+            google_translate,
+            google_tts,
+            google_stt,
         ])
         .on_window_event(|window, event| {
             // Đóng widget là thoát app (popup chỉ ẩn)

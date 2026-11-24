@@ -799,6 +799,7 @@ name = "dich-nhanh"
 version = "1.0.0"
 dependencies = [
  "arboard",
+ "native-tls",
  "ort",
  "serde",
  "serde_json",
@@ -4546,6 +4547,7 @@ dependencies = [
  "base64 0.22.1",
  "flate2",
  "log",
+ "native-tls",
  "once_cell",
  "rustls",
  "rustls-pki-types",

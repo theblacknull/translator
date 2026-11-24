@@ -7,6 +7,10 @@
     setSettings: (patch) => invoke('settings_set', { patch }),
     translate: (text, target, source) => invoke('translate', { text, target, source }),
     ttsSpeak: (text, lang) => invoke('tts_speak', { text, lang }),
+    // Endpoint Google (không cần khóa): dịch, đọc, nhận dạng giọng nói
+    googleTranslate: (text, target, source) => invoke('google_translate', { text, target, source }),
+    googleTts: (text, lang) => invoke('google_tts', { text, lang }),
+    googleStt: (pcm, langs) => invoke('google_stt', { pcm, langs }),
     voiceStatus: () => invoke('voice_status'),
     scanModels: () => invoke('models_scan'),
     minimize: () => invoke('win_minimize'),
