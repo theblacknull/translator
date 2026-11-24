@@ -71,8 +71,9 @@
       if (openSel === sel) return close();
       close();
       sync();
-      place(list, btn);
+      // Hiện trước rồi mới đo: danh sách ẩn có chiều cao 0 nên dễ bị đặt sai chỗ và bị cắt
       list.hidden = false;
+      place(list, btn);
       btn.classList.add('open');
       openSel = sel;
       const on = list.querySelector('.dd-item.on');
