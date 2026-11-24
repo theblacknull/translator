@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dịch nhanh</title>
+  <link rel="stylesheet" href="shared.css" />
+  <link rel="stylesheet" href="widget.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Thanh tiêu đề: kéo để di chuyển -->
+    <header class="titlebar drag">
+      <div class="traffic no-drag">
+        <button id="btn-close" class="tl tl-close" data-i18n-title="close" data-i18n-aria="close" title="Đóng" aria-label="Đóng"></button>
+        <button id="btn-min" class="tl tl-min" data-i18n-title="minimize" data-i18n-aria="minimize" title="Thu nhỏ" aria-label="Thu nhỏ"></button>
+      </div>
+      <div class="brand">
+        <span class="brand-logo" aria-hidden="true">文</span>
+        <span data-i18n="appName">Dịch nhanh</span>
+      </div>
+      <div class="win-buttons no-drag">
+        <button id="btn-settings" class="icon-btn" data-i18n-title="settings" data-i18n-aria="settings" title="Cài đặt" aria-label="Cài đặt">
+          <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Màn hình dịch -->
+    <main id="view-translate" class="view">
+      <div class="lang-bar">
+        <select id="src" class="lang-select" data-i18n-aria="srcLabel" aria-label="Ngôn ngữ nguồn"></select>
+        <button id="swap" class="icon-btn" data-i18n-title="swap" data-i18n-aria="swap" title="Hoán đổi ngôn ngữ" aria-label="Hoán đổi ngôn ngữ">
+          <svg viewBox="0 0 24 24"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>
+        </button>
+        <select id="tgt" class="lang-select" data-i18n-aria="tgtLabel" aria-label="Ngôn ngữ đích"></select>
+      </div>
+
+      <div class="panels">
+        <section class="card card-src">
+          <textarea id="input" data-i18n-placeholder="inputPlaceholder" placeholder="Nhập văn bản" maxlength="5000" spellcheck="false"></textarea>
+          <div class="card-foot">
+            <span id="count" class="muted">0/5000</span>
+            <div class="tools">
+              <button id="paste" class="icon-btn" data-i18n-title="paste" data-i18n-aria="paste" title="Dán từ clipboard" aria-label="Dán từ clipboard">
+                <svg viewBox="0 0 24 24" class="stroke"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1"/></svg>
+              </button>
+              <button id="clear" class="icon-btn" data-i18n-title="clear" data-i18n-aria="clear" title="Xóa" aria-label="Xóa">
+                <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+              <button id="speak-src" class="icon-btn" data-i18n-title="speakSrc" data-i18n-aria="speakSrc" title="Nghe văn bản gốc" aria-label="Nghe văn bản gốc">
+                <svg viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card card-out">
+          <div id="output" class="output placeholder" data-i18n="outputPlaceholder">Bản dịch</div>
+          <div id="error" class="error" hidden></div>
+          <div class="card-foot">
+            <span id="status" class="muted"></span>
+            <div class="tools">
+              <button id="speak-out" class="icon-btn" data-i18n-title="speakOut" data-i18n-aria="speakOut" title="Đọc bản dịch" aria-label="Đọc bản dịch">
+                <svg viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+              </button>
+              <button id="copy" class="icon-btn" data-i18n-title="copy" data-i18n-aria="copy" title="Sao chép" aria-label="Sao chép">
+                <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+      <p class="hint"><span data-i18n="hintA">Chọn chữ bằng chuột, rồi nhấn</span> <kbd>Alt</kbd> <span data-i18n="hintB">để dịch nhanh.</span></p>
+    </main>
+
+    <!-- Màn hình cài đặt -->
+    <main id="view-settings" class="view settings" hidden>
+      <div class="settings-head">
+        <button id="btn-back" class="icon-btn" data-i18n-title="back" data-i18n-aria="back" title="Quay lại" aria-label="Quay lại">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h2 data-i18n="settings">Cài đặt</h2>
+      </div>
+
+      <div class="settings-scroll">
+        <!-- Mô hình AI -->
+        <details class="grp">
+          <summary class="grp-row">
+            <span class="grp-icon ic-violet">
+              <svg viewBox="0 0 24 24" class="stroke"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+            </span>
+            <span class="grp-meta">
+              <span class="grp-title" data-i18n="grpModel">Mô hình AI</span>
+              <span class="grp-sub" id="sum-model">Tự động</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+          </summary>
+          <div class="grp-body">
+            <div class="row stack">
+              <label class="row-label" for="set-model" data-i18n="modelLabel">Model dịch</label>
+              <select id="set-model" class="pick wide"></select>
+            </div>
+            <div class="row stack">
+              <label class="row-label" for="set-base" data-i18n="apiAddr">Địa chỉ API</label>
+              <input id="set-base" class="field-input" spellcheck="false" autocomplete="off" />
+            </div>
+            <div class="row stack">
+              <label class="row-label" for="set-key" data-i18n="apiKey">API key</label>
+              <input id="set-key" class="field-input" type="password" data-i18n-placeholder="keyPh" placeholder="Đang dùng khóa trong .env" autocomplete="off" />
+            </div>
+            <div class="row actions pair">
+              <button id="set-scan" class="pill" data-i18n="scan">Quét model</button>
+              <button id="set-test" class="pill ghost" data-i18n="test">Kiểm tra kết nối</button>
+            </div>
+          </div>
+        </details>
+
+        <!-- Dịch nhanh -->
+        <details class="grp">
+          <summary class="grp-row">
+            <span class="grp-icon ic-blue">
+              <svg viewBox="0 0 24 24" class="stroke"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/></svg>
+            </span>
+            <span class="grp-meta">
+              <span class="grp-title" data-i18n="grpQuick">Dịch nhanh</span>
+              <span class="grp-sub" id="sum-target">Tiếng Việt</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+          </summary>
+          <div class="grp-body">
+            <div class="row">
+              <label class="row-label" for="set-target" data-i18n="tgtLabel">Ngôn ngữ đích</label>
+              <select id="set-target" class="pick"></select>
+            </div>
+            <div class="row">
+              <span class="row-label" data-i18n="autoSpeak">Tự đọc bản dịch</span>
+              <label class="switch">
+                <input id="set-autospeak" type="checkbox" />
+                <span class="track"><span class="thumb"></span></span>
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <!-- Giọng đọc -->
+        <details class="grp">
+          <summary class="grp-row">
+            <span class="grp-icon ic-green">
+              <svg viewBox="0 0 24 24" class="stroke"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>
+            </span>
+            <span class="grp-meta">
+              <span class="grp-title" data-i18n="grpVoice">Giọng đọc</span>
+              <span class="grp-sub" id="sum-voice">Giọng AI</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+          </summary>
+          <div class="grp-body">
+            <div class="row">
+              <label class="row-label" for="set-voice" data-i18n="voiceLabel">Giọng</label>
+              <select id="set-voice" class="pick"></select>
+            </div>
+            <div class="row stack">
+              <div class="row-line">
+                <label class="row-label" for="set-rate" data-i18n="rateLabel">Tốc độ</label>
+                <span class="value" id="rate-val">1.0×</span>
+              </div>
+              <input id="set-rate" class="slider" type="range" min="0.5" max="2" step="0.1" value="1" />
+            </div>
+            <div class="row actions">
+              <button id="set-voice-test" class="pill" data-i18n="voiceTest">Nghe thử</button>
+            </div>
+          </div>
+        </details>
+
+        <!-- Giọng theo ngôn ngữ -->
+        <details class="grp">
+          <summary class="grp-row">
+            <span class="grp-icon ic-orange">
+              <svg viewBox="0 0 24 24" class="stroke"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="M8 10h8M8 14h5"/></svg>
+            </span>
+            <span class="grp-meta">
+              <span class="grp-title" data-i18n="grpPerLang">Giọng theo ngôn ngữ</span>
+              <span class="grp-sub">Supertonic-3 · CPU</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+          </summary>
+          <div class="grp-body">
+            <ul id="voice-list" class="voice-list"></ul>
+          </div>
+        </details>
+
+        <!-- Ngôn ngữ ứng dụng -->
+        <details class="grp">
+          <summary class="grp-row">
+            <span class="grp-icon ic-blue">
+              <svg viewBox="0 0 24 24" class="stroke"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/></svg>
+            </span>
+            <span class="grp-meta">
+              <span class="grp-title" data-i18n="grpUiLang">Ngôn ngữ ứng dụng</span>
+              <span class="grp-sub" id="sum-ui-lang">Tiếng Việt</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+          </summary>
+          <div class="grp-body">
+            <div class="row">
+              <label class="row-label" for="set-ui-lang" data-i18n="grpUiLang">Ngôn ngữ ứng dụng</label>
+              <select id="set-ui-lang" class="pick wide">
+                <option value="vi">Tiếng Việt</option>
+                <option value="en">English</option>
+                <option value="ru">Русский</option>
+              </select>
+            </div>
+          </div>
+        </details>
+
+        <button id="set-uninstall" class="danger-row" type="button" data-i18n="uninstall">Gỡ cài đặt</button>
+      </div>
+    </main>
+
+    <!-- Hộp thoại xác nhận kiểu macOS -->
+    <div id="modal" class="modal" hidden>
+      <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-msg">
+        <div class="sheet-body">
+          <h3 id="modal-title"></h3>
+          <p id="modal-msg"></p>
+        </div>
+        <div class="sheet-actions">
+          <button id="modal-cancel" class="sheet-btn" data-i18n="cancel">Hủy</button>
+          <button id="modal-ok" class="sheet-btn primary" data-i18n="ok">Đồng ý</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="languages.js"></script>
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script src="speech.js"></script>
+  <script src="dropdown.js"></script>
+  <script src="widget.js"></script>
+</body>
+</html>

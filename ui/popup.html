@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Bản dịch nhanh</title>
+  <link rel="stylesheet" href="shared.css" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="card" class="popup">
+    <!-- Tay nắm đổi kích thước: mép trái, mép dưới và góc dưới-trái -->
+    <div class="rz rz-l" data-edge="l" title="Kéo để đổi chiều rộng"></div>
+    <div class="rz rz-b" data-edge="b" title="Kéo để đổi chiều cao"></div>
+    <div class="rz rz-bl" data-edge="bl" title="Kéo để đổi kích thước"></div>
+    <header class="p-head drag">
+      <button id="p-close" class="tl tl-close no-drag" data-i18n-title="close" data-i18n-aria="close" title="Đóng" aria-label="Đóng"></button>
+      <span class="p-title" data-i18n="appName">Dịch nhanh</span>
+      <span class="p-spacer"></span>
+    </header>
+
+    <div class="p-body">
+      <div class="p-source-row">
+        <div id="p-source" class="p-source"></div>
+        <button id="p-speak-src" class="icon-btn" data-i18n-title="speakSrc" data-i18n-aria="speakSrc" title="Đọc văn bản gốc" aria-label="Đọc văn bản gốc" disabled>
+          <svg viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+        </button>
+      </div>
+      <div id="p-loading" class="p-loading" hidden>
+        <span></span><span></span><span></span>
+      </div>
+      <div id="p-result" class="p-result"></div>
+      <div id="p-error" class="p-error" hidden></div>
+    </div>
+
+    <footer class="p-foot">
+      <select id="p-lang" class="p-lang-select" data-i18n-title="changeLang" data-i18n-aria="changeLang" title="Đổi ngôn ngữ dịch" aria-label="Đổi ngôn ngữ dịch"></select>
+      <div class="p-tools">
+        <button id="p-speak" class="icon-btn" data-i18n-title="speakOut" data-i18n-aria="speakOut" title="Đọc bản dịch" aria-label="Đọc bản dịch" disabled>
+          <svg viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+        </button>
+        <button id="p-copy" class="icon-btn" data-i18n-title="copy" data-i18n-aria="copy" title="Sao chép" aria-label="Sao chép" disabled>
+          <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="languages.js"></script>
+  <script src="i18n.js"></script>
+  <script src="api.js"></script>
+  <script src="speech.js"></script>
+  <script src="dropdown.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
